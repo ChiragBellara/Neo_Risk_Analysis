@@ -108,20 +108,86 @@ class Transformer:
         all_neos = []
         all_close_approaches = []
 
+        all_feed = []
         for fp in json_files:
             feed = json.loads(fp.read_text(encoding='utf-8'))
-            out = self._parse_json_feed(feed)
-            if out:
-                all_neos.append(out.neos)
-                all_close_approaches.append(out.close_approaches)
+            # out = self._parse_json_feed(feed)
+            out = self._flatten_json_feed(feed)
+            all_feed.extend(out)
 
         logger.info(f"Completed reading the Neos and Close Approaches")
-        neos_dataframe = pd.concat(all_neos, ignore_index=True).drop_duplicates(
-            subset=["neo_id"], keep="last")
-        closed_approached_dataframe = pd.concat(
-            all_close_approaches, ignore_index=True)
+        # neos_dataframe = pd.concat(all_neos, ignore_index=True).drop_duplicates(
+        #     subset=["neo_id"], keep="last")
+        # closed_approached_dataframe = pd.concat(
+        #     all_close_approaches, ignore_index=True)
 
-        neos_dataframe.to_parquet(
-            config.SILVER_DIR / "neos.parquet", index=False)
-        closed_approached_dataframe.to_parquet(
-            config.SILVER_DIR / "close_approaches.parquet", index=False)
+        # neos_dataframe.to_parquet(
+        #     config.SILVER_DIR / "neos.parquet", index=False)
+        # closed_approached_dataframe.to_parquet(
+        #     config.SILVER_DIR / "close_approaches.parquet", index=False)
+        return all_feed
+
+    def _flatten_json_feed(self, feed: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Return event rows the 3D viz can render.
+        One row per close approach event.
+        """
+        out: List[Dict[str, Any]] = []
+
+        by_day = feed.get("near_earth_objects", {})
+        for day, neos in by_day.items():
+            for neo in neos:
+                neo_id = str(neo.get("id"))
+                name = neo.get("name")
+                jpl = neo.get("nasa_jpl_url")
+                hazardous = bool(
+                    neo.get("is_potentially_hazardous_asteroid", False))
+                sentry = bool(neo.get("is_sentry_object", False))
+
+                km = (neo.get("estimated_diameter")
+                      or {}).get("kilometers") or {}
+                dmin = utils._safe_float(km.get("estimated_diameter_min"))
+                dmax = utils._safe_float(km.get("estimated_diameter_max"))
+                dmean = (0.5 * (dmin + dmax)
+                         ) if (dmin is not None and dmax is not None) else None
+
+                for ca in neo.get("close_approach_data", []) or []:
+                    miss_km = utils._safe_float(
+                        (ca.get("miss_distance") or {}).get("kilometers"))
+                    vel_kms = utils._safe_float(
+                        (ca.get("relative_velocity") or {}).get("kilometers_per_second"))
+
+                    # Simple risk score (optional)
+                    risk_score = None
+                    if miss_km and vel_kms is not None:
+                        import math
+                        risk_score = (
+                            math.log1p(1e8 / miss_km)
+                            + 1.2 * math.log1p((dmean or 0) * 1e3)
+                            + 0.8 * math.log1p(vel_kms)
+                            + (0.75 if hazardous else 0.0)
+                        )
+
+                    epoch = ca.get("epoch_date_close_approach")
+                    out.append(
+                        {
+                            "event_id": f"{neo_id}_{epoch or ca.get('close_approach_date')}",
+                            "neo_id": neo_id,
+                            "name": name,
+                            "nasa_jpl_url": jpl,
+                            "is_hazardous": hazardous,
+                            "is_sentry_object": sentry,
+                            "diameter_mean_km": dmean,
+                            "close_approach_date": ca.get("close_approach_date"),
+                            "close_approach_date_full": ca.get("close_approach_date_full"),
+                            "epoch_date_close_approach": epoch,
+                            "orbiting_body": ca.get("orbiting_body"),
+                            "relative_velocity_km_s": vel_kms,
+                            "miss_distance_km": miss_km,
+                            "miss_distance_lunar": utils._safe_float((ca.get("miss_distance") or {}).get("lunar")),
+                            "miss_distance_au": utils._safe_float((ca.get("miss_distance") or {}).get("astronomical")),
+                            "risk_score": risk_score,
+                        }
+                    )
+
+        return out
