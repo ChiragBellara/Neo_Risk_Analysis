@@ -5,6 +5,7 @@ import os
 from datetime import timedelta, datetime
 from neo_pipeline import config
 import neo_pipeline.logging as logging
+import neo_pipeline.utils.utils as utils
 
 logger = logging.setup_logger('ingestion_pipeline')
 
@@ -19,8 +20,7 @@ class Ingestor:
         """Saves the given JSON data to a file"""
         file_name = f"neo_extract_{start_date}.json"
         file_path = os.path.join(self.base_dir, file_name)
-        with open(file_path, 'w') as file:
-            json.dump(data, file)
+        utils.write_json(file_path, data)
         logger.info(f"Successfully saved: {file_path}")
 
     def _get_data_range(self, start_date_str=None, end_date_str=None):
