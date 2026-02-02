@@ -9,6 +9,5 @@ class Runner:
                                end_date_str=end_date)
 
         transform = Transformer()
-        # transform._transform()
-        outcome = transform._transform()
+        outcome = transform._transform(start_date)
         return outcome

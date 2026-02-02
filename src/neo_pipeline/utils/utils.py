@@ -7,9 +7,10 @@ def ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
 
 
-def write_json(path: str, obj) -> None:
-    with open(path) as file:
-        json.dump(obj, file, indent=2, encoding="utf-8")
+def write_json(path: str | Path, obj) -> None:
+    path = Path(path)
+    with path.open('w', encoding="utf-8") as file:
+        json.dump(obj, file, indent=2)
 
 
 def _safe_float(x: Any) -> float | None:

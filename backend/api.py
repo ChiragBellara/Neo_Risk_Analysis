@@ -1,6 +1,6 @@
 import uvicorn
 import time
-from datetime import date
+from datetime import date, timedelta
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from neo_pipeline.runner import Runner
@@ -20,21 +20,19 @@ app.add_middleware(
 
 
 @app.get("/api/neo/")
-def get_neo_feed(
-    start=None,
-    end=None,
-):
-    print(start, end)
-    # Quick validation: start <= end
-    if start and end:
-        s = date.fromisoformat(start)
-        e = date.fromisoformat(end)
-        if s > e:
-            return {"error": "start must be <= end"}
-
-    # Fetch + transform
-    events = api.runner(start_date=start, end_date=end) or []
-    return {"start": start, "end": end, "count": len(events), "events": events}
+def get_neo_feed(start=None, end=None,):
+    today = date.today()
+    # If start_date_str is None, then we assign start_date as today's date - 7 days
+    # If end_date_str is None, then we assign end_date as today's date
+    start_date = date.fromisoformat(
+        start) if start else today - timedelta(days=6)
+    end_date = date.fromisoformat(end) if end else today
+    if start_date > end_date:
+        return {"error": "start must be <= end"}
+    print(start_date, end_date)
+    events = api.runner(start_date=start_date.isoformat(),
+                        end_date=end_date.isoformat()) or []
+    return {"start": start_date, "end": end_date, "count": len(events), "events": events}
 
 
 if __name__ == "__main__":

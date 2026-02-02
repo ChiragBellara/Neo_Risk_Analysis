@@ -1,8 +1,7 @@
 import requests
 import time
-import json
 import os
-from datetime import timedelta, datetime
+from datetime import timedelta, date
 from neo_pipeline import config
 import neo_pipeline.logging as logging
 import neo_pipeline.utils.utils as utils
@@ -23,15 +22,10 @@ class Ingestor:
         utils.write_json(file_path, data)
         logger.info(f"Successfully saved: {file_path}")
 
-    def _get_data_range(self, start_date_str=None, end_date_str=None):
+    def _get_data_range(self, start_date_str, end_date_str):
         """Formats the date range for which the data is to be fetched"""
-        today = datetime.today()
-        # If start_date_str is None, then we assign start_date as today's date - 7 days
-        # If end_date_str is None, then we assign end_date as today's date
-        start_date = datetime.strptime(
-            start_date_str, '%Y-%m-%d') if start_date_str else today - timedelta(days=6)
-        end_date = datetime.strptime(
-            end_date_str, '%Y-%m-%d') if end_date_str else today
+        start_date = date.fromisoformat(start_date_str)
+        end_date = date.fromisoformat(end_date_str)
         logger.info(f"Start Date: {start_date}; End Date: {end_date}")
 
         current_start = start_date
