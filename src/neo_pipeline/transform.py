@@ -133,12 +133,16 @@ class Transformer:
         Return event rows the 3D viz can render.
         One row per close approach event.
         """
+        seen_neo_ids = set()
         out: List[Dict[str, Any]] = []
 
         by_day = feed.get("near_earth_objects", {})
         for _, neos in by_day.items():
             for neo in neos:
                 neo_id = str(neo.get("id"))
+                if neo_id in seen_neo_ids:
+                    continue
+                seen_neo_ids.add(neo_id)
                 name = neo.get("name")
                 jpl = neo.get("nasa_jpl_url")
                 hazardous = bool(
